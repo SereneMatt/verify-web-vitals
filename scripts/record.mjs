@@ -5,7 +5,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { bases, loadChromium, setupHint, skillDir } from './playwright.mjs';
 
-const usage = `Usage: node record.mjs --url <url> --widths <390,1280> --checks <checks.js> [--wait-for <selector>] [--out <dir>] [--height <px>] [--timeout <ms>] [--runs <n>] [--throttle] [--budget-lcp <ms>] [--budget-inp <ms>] [--budget-cls <score>] [--no-video]`;
+const usage = `Usage: node record.mjs --url <url> --widths <390,1280> --checks <checks.js> [--wait-for <selector>] [--out <dir>] [--height <px>] [--timeout <ms>] [--runs <n>] [--throttle] [--budget-lcp <ms>] [--budget-inp <ms>] [--budget-cls <score>] [--inp-not-applicable] [--no-video]`;
 
 const { values } = parseArgs({
   options: {
@@ -21,6 +21,7 @@ const { values } = parseArgs({
     'budget-lcp': { type: 'string', default: '2500' },
     'budget-inp': { type: 'string', default: '200' },
     'budget-cls': { type: 'string', default: '0.1' },
+    'inp-not-applicable': { type: 'boolean', default: false },
     'no-video': { type: 'boolean', default: false }
   }
 });
@@ -106,13 +107,13 @@ const openPage = async (context) => {
   return page;
 };
 
-const runJourney = async (page, mode) => {
+const runJourney = async (page, mode, benchmark = null) => {
   await page.goto(values.url, { waitUntil: 'load' });
   if (values['wait-for']) {
     await page.waitForSelector(values['wait-for'], { state: 'attached', timeout });
   }
   // A string evaluate runs through CDP, so a page Content-Security-Policy that blocks eval does not apply.
-  await page.evaluate(`(${overlaySource})(${checksSource}, ${JSON.stringify(mode)})`);
+  await page.evaluate(`(${overlaySource})(${checksSource}, ${JSON.stringify(mode)}, ${JSON.stringify(benchmark)})`);
   let timer;
   const timedOut = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(`checks did not finish within ${timeout}ms`)), timeout);
@@ -130,14 +131,21 @@ const budgetText = (name) => (name === 'CLS' ? `≤${budgets.CLS}` : `≤${budge
 
 const summarise = (samples) =>
   Object.keys(budgets).map((name) => {
+    if (name === 'INP' && values['inp-not-applicable']) {
+      return { name, status: 'not-applicable', pass: true, text: 'INP Not applicable — explicitly excluded for this journey' };
+    }
     const measured = samples.map((sample) => sample[name]).filter(Number.isFinite);
     if (measured.length < samples.length || measured.length === 0) {
-      return { name, pass: false, text: `${name} unavailable in ${samples.length - measured.length}/${samples.length} runs ${budgetText(name)} ❌` };
+      return { name, status: 'unavailable', pass: false, text: `${name} unavailable in ${samples.length - measured.length}/${samples.length} runs ${budgetText(name)} ❌` };
     }
     const mid = median(measured);
     const pass = mid <= budgets[name];
     return {
       name,
+      status: 'measured',
+      median: mid,
+      worst: Math.max(...measured),
+      budget: budgets[name],
       pass,
       text: `${name} ${format(name, mid)} median / ${format(name, Math.max(...measured))} worst ${budgetText(name)} ${pass ? '✅' : '❌'}`
     };
@@ -152,7 +160,7 @@ try {
   process.exit(2);
 }
 const conditions = [
-  `${runs} clean runs (no overlay, no recording, cold cache)`,
+  `${runs} benchmark runs (no overlay, no recording, cold cache)`,
   values.throttle
     ? `throttled: CPU ${throttle.cpu}×, ${throttle.latencyMs}ms latency, ${throttle.downloadKbps}/${throttle.uploadKbps} Kbps`
     : 'not throttled',
@@ -197,15 +205,15 @@ try {
     const page = await openPage(context);
     let results;
     try {
-      results = await runJourney(page, 'evidence');
+      results = await runJourney(page, 'evidence', { vitals, conditions });
       await page.evaluate(
         ([step, text]) => {
           window.qa.step(step);
           window.qa.summary(text);
         },
         [
-          `${width}px · Core Web Vitals, measured in clean runs, not in this video`,
-          [conditions, ...vitals.map((vital) => vital.text)].join('\n')
+          `${width}px · results`,
+          'Benchmark complete'
         ]
       );
       await page.waitForTimeout(3000);
