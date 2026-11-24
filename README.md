@@ -6,6 +6,8 @@ Measure LCP, INP and CLS on the same journey you use for functional checks. Exit
 
 Built for any project and for CI. Needs Node + a one-time Playwright Chromium install.
 
+https://github.com/user-attachments/assets/7ed32772-453e-406f-93ea-9c84433f5925
+
 ---
 
 ## Why this exists
