@@ -30,7 +30,7 @@ Done when every criterion has an observable, a unit and a width list.
 
 ## 3. Write the checks file
 
-One function expression in a scratchpad file. It registers the checks, then returns the journey for one width. Drive every interaction with `qa.act`: it is trusted Playwright input, so it produces the interactions INP measures.
+One function expression in a scratchpad file. It registers the checks, then returns the journey for one width. Drive every interaction with `qa.act`: clicks and keypresses are trusted Playwright input that INP can measure. Hover alone does not qualify.
 
 ```js
 (qa) => {
@@ -70,7 +70,7 @@ node <skill-dir>/scripts/record.mjs --url <url> --widths 390,719,720,1440 --chec
 
 `--wait-for` is the element your checks query first. Client-rendered pages add it after the `load` event, so without it the checks run against an empty page.
 
-Done when every width prints ✅ for every key and every vital, or each ❌ is a real defect you can explain in the criterion's unit. An unavailable vital is a ❌: INP needs at least one `qa.act` in the journey. The exit code is 0 only when everything passes.
+Done when every width prints ✅ for every key and every required vital, with any INP exclusion reported, or each ❌ is a real defect you can explain in the criterion's unit. An unavailable required vital is a ❌. INP needs a qualifying interaction such as a click or keypress. For an intentionally passive journey, explicitly add `--inp-not-applicable` and report that exclusion; INP displays “Not applicable” and does not fail verification. The exit code is 0 only when all criteria and required vitals pass.
 
 ## 5. Record and report
 
@@ -79,6 +79,10 @@ The same command without `--no-video`, plus `--out <dir>`. Read back the frames 
 ```sh
 node <skill-dir>/scripts/frame.mjs <dir>/390px.webm <seconds|end> <frame.png>
 ```
+
+Inspect every video at its recorded size: the benchmark rows must show median, worst, configured budget and matching status, or an explicit unavailable/not-applicable state. Verify that all three rows, conditions and final check results fit without clipping. Benchmark results appear throughout the evidence run; they come from the clean runs.
+
+Done when decoded frames from every video are readable and agree with the command-line results.
 
 Report each video path, the per-width results with measured values, the vitals medians, worst values and conditions line, every hidden widget, and each criterion you could only partly prove. The vitals are lab values under the printed conditions; Google assesses Core Web Vitals at the 75th percentile of real-user page loads.
 
@@ -94,5 +98,6 @@ Report each video path, the per-width results with measured values, the vitals m
 | `--runs <n>` | `3` | Clean runs per width; the report gives the median and worst |
 | `--throttle` | off | Clean runs only: Lighthouse's mobile preset (CPU 4×, 562.5ms latency, 1474.56/675 Kbps) |
 | `--budget-lcp`, `--budget-inp`, `--budget-cls` | `2500`, `200`, `0.1` | Budgets for the median; use the criterion's own when it is stricter |
+| `--inp-not-applicable` | off | Explicitly exclude INP for an intentionally passive journey; other missing metrics still fail |
 | `--no-video` | off | Dry run |
 

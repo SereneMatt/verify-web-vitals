@@ -2,9 +2,11 @@
 
 **One command. Headless Chromium. Clean Core Web Vitals. Video proof.**
 
-Measure LCP, INP and CLS on the same journey you use for functional checks. Exit 0 only when every criterion **and** every vital passes. Record one `.webm` per viewport that proves it.
+Measure LCP, INP and CLS on the same journey you use for functional checks. Exit 0 only when every criterion **and** every required vital passes. Record one `.webm` per viewport that proves it.
 
 Built for any project and for CI. Needs Node + a one-time Playwright Chromium install.
+
+https://github.com/user-attachments/assets/7ed32772-453e-406f-93ea-9c84433f5925
 
 ---
 
@@ -49,7 +51,7 @@ Add `--no-video` to see pass/fail for criteria + vitals without recording.
 
 ## Core Web Vitals
 
-Measured from **clean runs** (default 3) of the exact same journey:
+Measured from **benchmark runs** (also called clean runs; default 3) of the exact same journey:
 
 | Metric | Good (default budget) |
 |--------|-----------------------|
@@ -58,11 +60,12 @@ Measured from **clean runs** (default 3) of the exact same journey:
 | CLS    | ≤ 0.1                |
 
 - Median and worst values are reported.
-- INP requires at least one `qa.act` interaction.
+- INP requires a qualifying interaction, such as a click or keypress through `qa.act`; hovering alone does not qualify.
+- For an intentionally passive journey, use `--inp-not-applicable`. INP then displays “Not applicable” and does not fail verification. Missing required metrics still fail.
 - Optional `--throttle` applies Lighthouse mobile Slow 4G only to clean runs.
 - Budgets are overridable via `--budget-lcp`, `--budget-inp`, `--budget-cls`.
 
-The overlay (evidence run only) shows the final clean-run vitals large and colour-coded. Functional criteria stay compact.
+The overlay shows **Benchmark results** from the clean runs throughout the evidence video: medians, worst values, configured budgets and pass/fail statuses. Missing required metrics display “Unavailable ❌”. Functional criteria stay compact.
 
 ## Overlay philosophy
 
@@ -73,18 +76,15 @@ The recording should be watchable. The overlay:
 - Avoids dense logs, long tables, and unnecessary text that obscure the page.
 - Ends the video on a clear vitals summary so the proof is obvious from frames alone.
 
-## Compared with the T3 Code edition
+## Verify the video
 
-| | verify-ui-web-vitals | verify-ui-t3code-edition |
-|---|---|---|
-| Browser | Headless Chromium (Playwright) | T3 Code preview |
-| Driven by | Custom script | Agent, one tool call at a time |
-| Video | One `.webm` per width | One recording across all widths |
-| Result | Exit code 0/1 for CI | Agent-written report |
-| Setup | `npm install` + Playwright | None |
-| Core Web Vitals | Measured (clean runs) | Not measured |
+Extract the final frame from every recording, then inspect it at its recorded size:
 
-Use this one when you want vitals + CI. Use the T3 edition when you want zero extra tooling inside T3 Code.
+```bash
+node scripts/frame.mjs verify-videos/390px.webm end /tmp/390px-final.png
+```
+
+Confirm that all three metric rows, measurement conditions and acceptance results are readable, match the command-line report, and fit within the frame. Check journey frames for visual acceptance criteria as well.
 
 ## Requirements
 

@@ -1,15 +1,6 @@
-(checks, mode = 'evidence') => {
+(checks, mode = 'evidence', benchmark = null) => {
   const display = mode === 'evidence';
   const ok = (pass) => (pass === undefined || pass === null ? '⏳' : pass ? '✅' : '❌');
-
-  // Colour helpers for vitals (default budgets; runner may override display later)
-  const vitalColor = (name, value) => {
-    if (value == null) return '#888';
-    if (name === 'LCP') return value <= 2500 ? '#4ade80' : value <= 4000 ? '#fbbf24' : '#f87171';
-    if (name === 'INP') return value <= 200 ? '#4ade80' : value <= 500 ? '#fbbf24' : '#f87171';
-    if (name === 'CLS') return value <= 0.1 ? '#4ade80' : value <= 0.25 ? '#fbbf24' : '#f87171';
-    return '#eee';
-  };
 
   const formatVital = (name, value) => {
     if (value == null) return '—';
@@ -73,11 +64,11 @@
       background:rgba(15,15,20,.88); color:#eee;
       font:13px/1.4 system-ui, -apple-system, sans-serif;
       padding:10px 14px; border-radius:10px; pointer-events:none;
-      display:flex; align-items:center; gap:16px; max-height:64px;
+      display:flex; align-items:center; gap:8px; flex-wrap:wrap;
       box-shadow:0 4px 24px rgba(0,0,0,.4);
     `;
     overlay.innerHTML = `
-      <div data-step style="font-weight:600; color:#ffd166; min-width:140px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+      <div data-step style="font-weight:600; color:#ffd166; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
       <div data-criteria style="flex:1; color:#ccc; font-size:12px;"></div>
     `;
     document.body.append(overlay);
@@ -87,35 +78,51 @@
     // Floating vitals card (top-right) — visual focus
     const vitalsPanel = document.createElement('div');
     vitalsPanel.style.cssText = `
-      position:fixed; top:12px; right:12px; z-index:2147483647;
-      background:rgba(15,15,20,.92); color:#eee;
+      position:fixed; ${width < 600 ? 'bottom:72px' : 'top:12px'}; right:12px; z-index:2147483647;
+      background:#17171d; color:#eee;
       font:14px/1.3 system-ui, -apple-system, sans-serif;
       padding:12px 16px; border-radius:12px; pointer-events:none;
-      min-width:240px; box-shadow:0 6px 32px rgba(0,0,0,.5);
+      box-sizing:border-box; width:320px; max-width:calc(100vw - 24px); box-shadow:0 6px 32px rgba(0,0,0,.5);
     `;
     vitalsPanel.innerHTML = `
-      <div style="font-size:11px; letter-spacing:0.5px; color:#9ca3af; margin-bottom:6px; text-transform:uppercase;">Core Web Vitals</div>
+      <div style="font-size:11px; letter-spacing:0.5px; color:#9ca3af; margin-bottom:6px; text-transform:uppercase;">Benchmark results · Core Web Vitals</div>
       <div data-vitals style="display:flex; flex-direction:column; gap:4px;"></div>
-      <div data-summary style="margin-top:8px; font-size:11px; color:#9ca3af; white-space:pre-wrap; max-height:120px; overflow:hidden;"></div>
+      <div data-summary style="margin-top:8px; font-size:11px; color:#9ca3af; white-space:pre-wrap; overflow-wrap:anywhere;"></div>
     `;
     document.body.append(vitalsPanel);
     vitalsContainer = vitalsPanel.querySelector('[data-vitals]');
     summaryEl = vitalsPanel.querySelector('[data-summary]');
   }
 
-  const updateVitalsDisplay = (vitals = {}) => {
+  const updateVitalsDisplay = () => {
     if (!display || !vitalsContainer) return;
-    const lines = ['LCP', 'INP', 'CLS'].map(name => {
-      const value = vitals[name];
-      const color = vitalColor(name, value);
-      const formatted = formatVital(name, value);
-      const status = value == null ? '⏳' : (color === '#4ade80' ? '✅' : '❌');
-      return `<div style="display:flex; justify-content:space-between; align-items:baseline;">
-        <span style="color:#9ca3af;">${name}</span>
-        <span style="font-weight:700; font-size:18px; color:${color};">${formatted} ${status}</span>
-      </div>`;
-    });
-    vitalsContainer.innerHTML = lines.join('');
+    vitalsContainer.replaceChildren();
+    for (const vital of benchmark?.vitals || []) {
+      const row = document.createElement('div');
+      row.dataset.metric = vital.name;
+      row.style.cssText = 'padding:6px 0; border-bottom:1px solid #374151;';
+      const main = document.createElement('div');
+      main.style.cssText = 'display:flex; justify-content:space-between; gap:8px; align-items:baseline;';
+      const label = document.createElement('span');
+      label.textContent = vital.name;
+      const value = document.createElement('span');
+      value.style.cssText = 'font-weight:700; font-size:18px; text-align:right;';
+      value.style.color = vital.status === 'not-applicable' ? '#9ca3af' : vital.pass ? '#4ade80' : '#f87171';
+      value.textContent = vital.status === 'not-applicable'
+        ? 'Not applicable'
+        : vital.status === 'unavailable'
+          ? 'Unavailable ❌'
+          : `${formatVital(vital.name, vital.median)} ${vital.pass ? '✅' : '❌'}`;
+      main.append(label, value);
+      const detail = document.createElement('div');
+      detail.style.cssText = 'font-size:11px; color:#9ca3af; margin-top:3px; overflow-wrap:anywhere;';
+      detail.textContent = vital.status === 'measured'
+        ? `median · ${formatVital(vital.name, vital.worst)} worst · budget ≤${vital.budget}${vital.name === 'CLS' ? '' : 'ms'}`
+        : vital.text;
+      row.append(main, detail);
+      vitalsContainer.append(row);
+    }
+    if (summaryEl) summaryEl.textContent = benchmark?.conditions || '';
   };
 
   const updateCriteriaDisplay = () => {
@@ -207,8 +214,8 @@
         .map(([key, pass]) => `${key}${ok(pass)}`)
         .join(' ')}`,
     summary: (text) => {
-      // Runner calls this at the end with clean-run vitals text
-      if (summaryEl) summaryEl.textContent = text || '';
+      // Keep the measurement conditions visible alongside the final summary.
+      if (summaryEl) summaryEl.textContent = [text, benchmark?.conditions].filter(Boolean).join('\n');
       if (stepEl) stepEl.textContent = currentStep || `${width}px · results`;
     },
     shifts: (root) =>
@@ -283,8 +290,8 @@
   };
 
   if (display) {
+    updateVitalsDisplay();
     const tick = () => {
-      updateVitalsDisplay(window.__qaVitals || {});
       updateCriteriaDisplay();
       requestAnimationFrame(tick);
     };
