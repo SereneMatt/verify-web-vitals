@@ -31,7 +31,7 @@
     "web-vitals": "6.2.3"
   },
   "devDependencies": {
-    "oxfmt": "0.78.0"
+    "oxfmt": "0.80.0"
   },
   "packageManager": "bun@1.4.5"
 }
