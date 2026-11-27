@@ -16,7 +16,7 @@ This is a showcase for the verify-web-vitals skill: [checks.js](checks.js) prove
 
 ## Run
 
-From the repo root (after `bun install` and `bunx playwright install chromium` in the skill folder):
+From the repo root (after `bun install` and `bunx playwright-core install chromium` in the skill folder):
 
 ```bash
 node scripts/record.mjs \

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import test from 'node:test';
-import { chromium } from 'playwright';
+import { chromium } from 'playwright-core';
 
 const exec = promisify(execFile);
 
