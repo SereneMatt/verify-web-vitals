@@ -60,7 +60,7 @@ The same command without `--no-video`, plus `--out <dir>`. The clean-run samples
 node <skill-dir>/scripts/frame.mjs <dir>/390px.webm <seconds|end> <frame.png>
 ```
 
-Inspect every video at its recorded size: the benchmark rows must show median, worst, configured budget and matching status, or an explicit unavailable/not-applicable state. Verify that all three rows, conditions and final check results fit without clipping. Benchmark results appear throughout the evidence run; they come from the clean runs.
+Inspect every video at its recorded size: the benchmark rows must show median, worst, configured budget and matching status, or an explicit unavailable/not-applicable state. Verify that all three rows, conditions and final check results fit without clipping. Benchmark results appear at the end of the evidence run, after the checks; they come from the clean runs.
 
 Done when decoded frames from every video are readable and agree with the command-line results.
 
