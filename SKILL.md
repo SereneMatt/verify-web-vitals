@@ -12,9 +12,9 @@ Record one video per width in which every acceptance criterion is **verifiable**
 
 ## 1. Set up once
 
-In this skill's folder: `bun install`, then `bunx playwright install chromium`.
+In this skill's folder: `bun install`, then `bunx playwright-core install chromium`.
 
-Without a copy of the skill, `npx verify-web-vitals <options>` runs the same runner from npm, and `npx verify-web-vitals-frame` runs `frame.mjs`; install Chromium once with `npx -p verify-web-vitals playwright install chromium`, which matches the package's pinned Playwright.
+Without a copy of the skill, `npx verify-web-vitals <options>` runs the same runner from npm, and `npx verify-web-vitals-frame` runs `frame.mjs`; install Chromium once with `npx -p verify-web-vitals playwright-core install chromium`, which matches the package's pinned Playwright.
 
 Done when both commands exit 0.
 

@@ -1,6 +1,6 @@
 # verify-web-vitals
 
-A tool to help agents record LCP, INP and CLS on the same workflow you use for functional checks.
+A tool to help agents record LCP, INP, and CLS on the same workflow you use for functional checks.
 
 https://github.com/user-attachments/assets/eb4dbbc8-9e6a-4405-8102-f5ba9d2948cd
 
@@ -15,17 +15,17 @@ When you would like to
 
 Exit code is 0 only when everything passes — perfect for CI.
 
-## Quick start
+## How to use
 
 ```bash
-npx -p verify-web-vitals playwright install chromium
+npx -p verify-web-vitals playwright-core install chromium
 ```
 
 To start a verification:
 
 ```bash
 npx verify-web-vitals \
-  --url https://example.com \
+  --url https://your-site.com \
   --widths 390,719,720,1440 \
   --checks ./checks.js \
   --wait-for '[data-ready]' \
