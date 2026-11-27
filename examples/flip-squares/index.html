@@ -5,84 +5,104 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Flip squares</title>
     <style>
+      :root {
+        color-scheme: light;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        color: #263e32;
+        background: #f7f6f0;
+      }
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
-        padding: 16px;
-        font: 16px/1.4 system-ui, sans-serif;
-        background: #d6d6d6;
-        color: #111;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        min-height: 100vh;
-        box-sizing: border-box;
+      }
+      main {
+        max-width: 820px;
+        margin: auto;
+        padding: clamp(20px, 4vw, 64px);
+        text-align: center;
       }
       h1 {
         margin: 0 0 4px;
         font-size: 24px;
-        text-align: center;
       }
       p {
-        margin: 0 0 12px;
-        text-align: center;
+        margin: 0 0 clamp(16px, 3vw, 32px);
       }
       [data-board] {
         display: grid;
-        grid-template-columns: repeat(8, 1fr);
-        width: min(100%, 480px);
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: clamp(10px, 2vw, 24px);
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+      [data-square] {
         aspect-ratio: 1;
-        border: 2px solid #111;
-        box-sizing: border-box;
+        perspective: 800px;
       }
-      @media (min-width: 720px) {
-        [data-board] {
-          width: min(100%, 560px);
-        }
+      .card {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        transform-style: preserve-3d;
+        transition: transform 0.5s ease;
       }
-      @media (min-width: 1024px) {
-        [data-board] {
-          width: min(100%, 640px);
-        }
+      [data-flipped='true'] .card {
+        transform: rotateY(180deg);
       }
-      @media (min-width: 1440px) {
-        [data-board] {
-          width: min(100%, 720px);
-        }
+      .face {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        border-radius: 22%;
+        border: 1px solid #263e320a;
+        backface-visibility: hidden;
       }
-      [data-color='black'] {
-        background: #000;
+      .front {
+        background: var(--tile);
       }
-      [data-color='white'] {
-        background: #fff;
+      .back {
+        background: #263e32;
+        color: var(--tile);
+        font-size: clamp(28px, 7vw, 90px);
+        font-weight: 700;
+        transform: rotateY(180deg);
       }
       button {
-        margin-top: 12px;
+        margin-top: clamp(16px, 3vw, 32px);
         padding: 6px 14px;
         font: inherit;
       }
     </style>
   </head>
   <body>
-    <h1>Flip squares</h1>
-    <p>Hover a square to flip it.</p>
-    <div data-board></div>
-    <button type="button" data-reset>Reset</button>
+    <main>
+      <h1>Flip squares</h1>
+      <p>Hover a square to flip it.</p>
+      <ul data-board></ul>
+      <button type="button" data-reset>Reset</button>
+    </main>
     <script>
       const board = document.querySelector('[data-board]');
-      const initialColor = (index) => ((Math.floor(index / 8) + (index % 8)) % 2 === 0 ? 'black' : 'white');
-      const squares = Array.from({ length: 64 }, (_, index) => {
-        const square = document.createElement('div');
+      const tiles = ['#f7dfca', '#e7e5f0', '#e0ebd5', '#f7e9be', '#dceaf0'];
+      const squares = tiles.map((tile, index) => {
+        const square = document.createElement('li');
         square.dataset.square = index;
-        square.dataset.color = initialColor(index);
+        square.dataset.flipped = 'false';
+        square.style.setProperty('--tile', tile);
+        square.innerHTML = `<div class="card"><div class="face front"></div><div class="face back">${index + 1}</div></div>`;
         square.addEventListener('pointerenter', () => {
-          square.dataset.color = square.dataset.color === 'black' ? 'white' : 'black';
+          square.dataset.flipped = square.dataset.flipped === 'true' ? 'false' : 'true';
         });
         return square;
       });
       board.append(...squares);
       document.querySelector('[data-reset]').addEventListener('click', () => {
-        squares.forEach((square, index) => {
-          square.dataset.color = initialColor(index);
+        squares.forEach((square) => {
+          square.dataset.flipped = 'false';
         });
       });
     </script>

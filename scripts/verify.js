@@ -1,4 +1,4 @@
-(checks, mode = 'evidence', benchmark = null) => {
+(checks, mode = 'evidence', benchmark = null, recording = false) => {
   const display = mode === 'evidence';
   const ok = (pass) => (pass === undefined || pass === null ? '⏳' : pass ? '✅' : '❌');
 
@@ -8,15 +8,19 @@
     return `${Math.round(value)}ms`;
   };
 
+  // Chromium keeps layout-shift entries out of performance.getEntriesByType, so only an observer sees them.
   const shiftEntries = [];
-  if (display) {
-    try {
-      new PerformanceObserver((list) => shiftEntries.push(...list.getEntries())).observe({
-        type: 'layout-shift',
-        buffered: true
-      });
-    } catch {}
-  }
+  let shiftObserver;
+  try {
+    shiftObserver = new PerformanceObserver((list) => shiftEntries.push(...list.getEntries()));
+    shiftObserver.observe({ type: 'layout-shift', buffered: true });
+  } catch {}
+  const describe = (node) => {
+    if (!(node instanceof Element)) {
+      return node ? node.nodeName.toLowerCase() : 'removed element';
+    }
+    return `${node.localName}${node.id ? `#${node.id}` : ''}${[...node.classList].map((name) => `.${name}`).join('')}`;
+  };
 
   const channels = (color) => (color.match(/[\d.]+/g) || []).map(Number);
   const luminance = (color) => {
@@ -35,7 +39,6 @@
           animation.timeline instanceof DocumentTimeline &&
           animation.effect?.getComputedTiming().endTime !== Infinity
       );
-  const animating = () => finiteAnimations().length > 0;
   const settle = () =>
     new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Animations did not settle within 5s')), 5000);
@@ -52,12 +55,12 @@
   const liveChecks = [];
   const loads = [];
   const results = {};
+  const details = {};
   let currentStep = '';
 
   let stepEl, criteriaEl, vitalsContainer, summaryEl;
 
   if (display) {
-    // Slim bottom bar: step + compact criteria
     const overlay = document.createElement('div');
     overlay.style.cssText = `
       position:fixed; left:8px; right:8px; bottom:8px; z-index:2147483647;
@@ -75,7 +78,6 @@
     stepEl = overlay.querySelector('[data-step]');
     criteriaEl = overlay.querySelector('[data-criteria]');
 
-    // Floating vitals card (top-right) — visual focus
     const vitalsPanel = document.createElement('div');
     vitalsPanel.style.cssText = `
       position:fixed; ${width < 600 ? 'bottom:72px' : 'top:12px'}; right:12px; z-index:2147483647;
@@ -108,17 +110,19 @@
       const value = document.createElement('span');
       value.style.cssText = 'font-weight:700; font-size:18px; text-align:right;';
       value.style.color = vital.status === 'not-applicable' ? '#9ca3af' : vital.pass ? '#4ade80' : '#f87171';
-      value.textContent = vital.status === 'not-applicable'
-        ? 'Not applicable'
-        : vital.status === 'unavailable'
-          ? 'Unavailable ❌'
-          : `${formatVital(vital.name, vital.median)} ${vital.pass ? '✅' : '❌'}`;
+      value.textContent =
+        vital.status === 'not-applicable'
+          ? 'Not applicable'
+          : vital.status === 'unavailable'
+            ? 'Unavailable ❌'
+            : `${formatVital(vital.name, vital.median)} ${vital.pass ? '✅' : '❌'}`;
       main.append(label, value);
       const detail = document.createElement('div');
       detail.style.cssText = 'font-size:11px; color:#9ca3af; margin-top:3px; overflow-wrap:anywhere;';
-      detail.textContent = vital.status === 'measured'
-        ? `median · ${formatVital(vital.name, vital.worst)} worst · budget ≤${vital.budget}${vital.name === 'CLS' ? '' : 'ms'}`
-        : vital.text;
+      detail.textContent =
+        vital.status === 'measured'
+          ? `median · ${formatVital(vital.name, vital.worst)} worst · budget ≤${vital.budget}${vital.name === 'CLS' ? '' : 'ms'}`
+          : vital.text;
       row.append(main, detail);
       vitalsContainer.append(row);
     }
@@ -141,10 +145,11 @@
     }
   };
 
-  const qa = {
+  const verify = {
     width,
     ok,
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    pause: (ms) => (display && recording ? verify.sleep(ms) : Promise.resolve()),
     step: (text) => {
       currentStep = text;
       if (stepEl) stepEl.textContent = text;
@@ -155,7 +160,10 @@
     },
     log: (text, pass, key) => {
       if (key !== undefined) {
-        qa.record(key, results[key] === false || pass === false ? false : pass);
+        if (results[key] !== false || pass === false) {
+          details[key] = text;
+        }
+        verify.record(key, results[key] === false || pass === false ? false : pass);
       }
       updateCriteriaDisplay();
     },
@@ -169,21 +177,26 @@
         evaluateSettled(evaluate)
           .then((settled) => {
             result = settled;
-            qa.log(settled.detail, settled.pass, key);
+            verify.log(settled.detail, settled.pass, key);
           })
           .catch((error) => {
             result = { pass: false, detail: error.message };
-            qa.log(error.message, false, key);
+            verify.log(error.message, false, key);
           })
       );
     },
     settle,
     logSettled: (key, evaluate) =>
       evaluateSettled(evaluate).then(({ pass, detail }) => {
-        qa.log(detail, pass, key);
+        verify.log(detail, pass, key);
         return pass;
       }),
-    act: (action, selector, target) => window.qaAct(action, selector, target),
+    act: (action, selector, target) => {
+      if (action !== 'hover') {
+        window.__verifyInput?.();
+      }
+      return window.verifyAct(action, selector, target);
+    },
     hide: (selector) => {
       document.head.insertAdjacentHTML('beforeend', `<style>${selector}{display:none!important}</style>`);
     },
@@ -214,9 +227,22 @@
         .map(([key, pass]) => `${key}${ok(pass)}`)
         .join(' ')}`,
     summary: (text) => {
-      // Keep the measurement conditions visible alongside the final summary.
       if (summaryEl) summaryEl.textContent = [text, benchmark?.conditions].filter(Boolean).join('\n');
       if (stepEl) stepEl.textContent = currentStep || `${width}px · results`;
+    },
+    layoutShifts: (root) => {
+      shiftEntries.push(...(shiftObserver?.takeRecords() ?? []));
+      return shiftEntries
+        .filter((entry) => !root || entry.sources?.some((source) => source.node && root.contains(source.node)))
+        .map((entry) => ({
+          value: entry.value,
+          startTime: entry.startTime,
+          hadRecentInput: entry.hadRecentInput,
+          sources: (entry.sources ?? []).map((source) => ({
+            selector: describe(source.node),
+            node: source.node ?? null
+          }))
+        }));
     },
     shifts: (root) =>
       shiftEntries.filter((entry) => entry.sources?.some((source) => source.node && root.contains(source.node))),
@@ -238,7 +264,7 @@
 
   if (!display) {
     const skip = () => {};
-    Object.assign(qa, {
+    Object.assign(verify, {
       step: skip,
       summary: skip,
       log: skip,
@@ -248,45 +274,45 @@
       logSettled: () => Promise.resolve(undefined)
     });
   }
-  window.qa = qa;
+  window.verify = verify;
 
   let script;
   let setupError;
   try {
-    script = checks(qa);
+    script = checks(verify);
   } catch (error) {
     setupError = error;
-    qa.log(`checks failed to load: ${error.message}`, false, 'setup');
+    verify.log(`checks failed to load: ${error.message}`, false, 'setup');
   }
 
-  qa.run = async () => {
+  verify.run = async () => {
     try {
       if (setupError && !display) {
         throw setupError;
       }
       await Promise.all(loads);
       if (typeof script === 'function') {
-        await script(qa);
+        await script(verify);
       }
       if (display) {
-        await qa.settle();
+        await verify.settle();
         for (const { label, evaluate } of liveChecks.filter((check) => !check.onLoad)) {
           try {
             const { pass, detail } = evaluate();
-            qa.log(`${label}: ${detail}`, pass, label);
+            verify.log(detail, pass, label);
           } catch (error) {
-            qa.log(`${label} threw ${error.message}`, false, label);
+            verify.log(`threw ${error.message}`, false, label);
           }
         }
       }
     } catch (error) {
-      qa.log(`script failed: ${error.message}`, false, 'script');
+      verify.log(`script failed: ${error.message}`, false, 'script');
       if (!display) {
         throw error;
       }
     }
-    qa.step(`${width}px · results`);
-    return { ...results };
+    verify.step(`${width}px · results`);
+    return Object.fromEntries(Object.entries(results).map(([key, pass]) => [key, { pass, detail: details[key] }]));
   };
 
   if (display) {

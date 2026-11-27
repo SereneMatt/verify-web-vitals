@@ -1,18 +1,20 @@
 ---
-name: verify-ui-with-web-vitals
-description: Measure Core Web Vitals in clean runs and record headless Playwright videos, one per viewport width, that prove a page meets its acceptance criteria.
+name: verify-web-vitals
+description: Measure Core Web Vitals and record headless videos, one per viewport width, that prove a page meets its acceptance criteria.
 disable-model-invocation: true
 ---
 
-# Verify UI with Web Vitals
+# Verify Web Vitals
 
-Record one video per width in which every acceptance criterion is **verifiable** from the frames alone: a viewer reads the measured value and its ✅/❌ on screen, without trusting the narration. Core Web Vitals come from **clean runs** of the same journey. A clean run adds nothing visible to the page: it injects the vitals collector, plus the overlay and your checks in clean mode, which only drive the journey.
+Record one video per width in which every acceptance criterion is **verifiable** from the frames alone: a viewer reads the measured value and its ✅/❌ on screen, without trusting the narration. A clean run adds nothing visible to the page: it injects the vitals collector, plus the overlay and your checks in clean mode, which only drive the journey.
 
-`scripts/record.mjs` drives headless Chromium. For each width it runs the clean runs first, then the **evidence run**: it injects `scripts/overlay.js` and your checks after each page load, records `<width>px.webm`, and ends the video on the clean-run vitals. The checks for each task are yours to write.
+`scripts/record.mjs` drives headless Chromium. The checks for each task are yours to write.
 
 ## 1. Set up once
 
-In this skill's folder: `npm install`, then `npx playwright install chromium`. The runner resolves `playwright` and `web-vitals` from this folder first, then from the working directory.
+In this skill's folder: `bun install`, then `bunx playwright install chromium`.
+
+Without a copy of the skill, `npx verify-web-vitals <options>` runs the same runner from npm, and `npx verify-web-vitals-frame` runs `frame.mjs`; install Chromium once with `npx -p verify-web-vitals playwright install chromium`, which matches the package's pinned Playwright.
 
 Done when both commands exit 0.
 
@@ -20,9 +22,9 @@ Done when both commands exit 0.
 
 For every criterion, write down:
 
-- **Observable**: the DOM value that proves it (`scrollLeft`, `disabled`, a rect, `visibility`, `location.href`).
-- **Unit**: the unit the criterion itself names. "Moves 2 cards" is counted in cards (the index of the first fully visible card), not pixels. A proxy unit logs false ❌ on correct behaviour, for example after scroll-snap or a clamp at the end.
-- **Widths**: both sides of every breakpoint the criterion names (719 and 720), plus one mobile and one wide width. Read breakpoint values from source.
+- **Observable**: the DOM value that proves it.
+- **Unit**: the unit the criterion itself names. A proxy unit logs false ❌ on correct behaviour.
+- **Widths**: both sides of every breakpoint the criterion names, plus one mobile and one wide width. Read breakpoint values from source.
 
 Include the empty, loading, error, disabled, focus and overflow states the criteria touch. Clipping, overlap and focus visibility need a frame, not only a DOM value; mark those partial until you have inspected one.
 
@@ -30,37 +32,11 @@ Done when every criterion has an observable, a unit and a width list.
 
 ## 3. Write the checks file
 
-One function expression in a scratchpad file. It registers the checks, then returns the journey for one width. Drive every interaction with `qa.act`: clicks and keypresses are trusted Playwright input that INP can measure. Hover alone does not qualify.
+One function expression in a scratchpad file.
 
-```js
-(qa) => {
-  qa.hide('#cookie-banner');
-  const row = document.querySelector('[data-cards]');
-  const prev = document.querySelector('[data-prev]');
-  const next = document.querySelector('[data-next]');
-  qa.focus(row);
-  qa.onLoad('start', () => ({ pass: prev.disabled, detail: `card #${qa.firstFullyVisible(row)}` }));
-  qa.check('Next contrast', () => {
-    const ratio = qa.contrast(qa.color(next), qa.background(next));
-    return { pass: ratio >= 3, detail: `${ratio.toFixed(2)}:1` };
-  });
+Hide third-party widgets that cover the overlay or the element under test with `verify.hide(selector)`: the evidence run discloses it on screen and the clean runs keep the widget, so vitals measure the real page. For OneTrust, Cookiebot and Didomi consent dialogs, `--hide-consent` does the same without a selector and adds the disclosure to the conditions line.
 
-  return async () => {
-    qa.step(`${qa.width}px · start`);
-    await qa.sleep(1500);
-    qa.step(`${qa.width}px · click Next`);
-    const scrolled = new Promise((resolve) => row.addEventListener('scrollend', resolve, { once: true }));
-    await qa.act('click', '[data-next]');
-    await Promise.race([scrolled, qa.sleep(1500)]);
-    await qa.logSettled('next', () => ({ pass: qa.firstFullyVisible(row) === 1, detail: `card #${qa.firstFullyVisible(row)}` }));
-    await qa.sleep(1500);
-  };
-};
-```
-
-The same file runs in both modes. In a clean run `act`, `sleep`, `settle` and the measuring helpers work, and everything that touches the page or evaluates a check does nothing: `hide`, `focus`, `step`, `log`, `check`, `onLoad`; `logSettled` resolves `undefined`. Keep the journey's control flow independent of what those return.
-
-Hide third-party widgets that cover the overlay or the element under test with `qa.hide(selector)`: the evidence run discloses it on screen and the clean runs keep the widget, so vitals measure the real page.
+For a layout-shift criterion, use `verify.layoutShifts(root)`. `performance.getEntriesByType('layout-shift')` returns nothing in Chromium, so a check built on it passes on an empty list.
 
 ## 4. Dry run
 
@@ -68,13 +44,17 @@ Hide third-party widgets that cover the overlay or the element under test with `
 node <skill-dir>/scripts/record.mjs --url <url> --widths 390,719,720,1440 --checks <checks.js> --wait-for '<selector>' --no-video
 ```
 
-`--wait-for` is the element your checks query first. Client-rendered pages add it after the `load` event, so without it the checks run against an empty page.
+It also saves `<out>/<width>px.png`, taken at the end of the journey, even when the journey fails.
 
-Done when every width prints ✅ for every key and every required vital, with any INP exclusion reported, or each ❌ is a real defect you can explain in the criterion's unit. An unavailable required vital is a ❌. INP needs a qualifying interaction such as a click or keypress. For an intentionally passive journey, explicitly add `--inp-not-applicable` and report that exclusion; INP displays “Not applicable” and does not fail verification. The exit code is 0 only when all criteria and required vitals pass.
+Every check prints its `detail` next to its ✅ or ❌.
+
+`--wait-for` is the element your checks query first.
+
+Done when every width prints ✅ for every key and every required vital is available, with any INP exclusion reported, or each ❌ is a real defect you can explain in the criterion's unit. An unavailable required vital is a ❌. INP needs a qualifying interaction such as a click or keypress. For an intentionally passive journey, explicitly add `--inp-not-applicable` and report that exclusion; INP displays “Not applicable” and does not fail verification. The exit code is 0 only when all criteria and required vitals pass.
 
 ## 5. Record and report
 
-The same command without `--no-video`, plus `--out <dir>`. Read back the frames that carry visual criteria and the final vitals frame:
+The same command without `--no-video`, plus `--out <dir>`. The clean-run samples are saved to `<dir>/benchmark.json`, keyed by URL, viewport, `--wait-for`, run count, throttle, time zone, locale and a hash of the request headers. To re-record after changing only the evidence (overlay steps, pauses, check labels), add `--reuse-benchmark`: matching widths skip their clean runs and the conditions line says the results were reused. Do not reuse after changing the page or the journey. Read back the frames that carry visual criteria and the final vitals frame:
 
 ```sh
 node <skill-dir>/scripts/frame.mjs <dir>/390px.webm <seconds|end> <frame.png>
@@ -88,16 +68,21 @@ Report each video path, the per-width results with measured values, the vitals m
 
 ## Runner options
 
-| Option | Default | Use |
-| --- | --- | --- |
-| `--url`, `--widths`, `--checks` | required | Page, comma-separated widths, checks file |
-| `--wait-for <selector>` | none | Wait until the element is in the DOM before injecting |
-| `--out <dir>` | `verify-videos` | Where `<width>px.webm` goes |
-| `--height <px>` | `900` | Viewport and video height |
-| `--timeout <ms>` | `60000` | Per run; a journey that never finishes fails that run |
-| `--runs <n>` | `3` | Clean runs per width; the report gives the median and worst |
-| `--throttle` | off | Clean runs only: Lighthouse's mobile preset (CPU 4×, 562.5ms latency, 1474.56/675 Kbps) |
-| `--budget-lcp`, `--budget-inp`, `--budget-cls` | `2500`, `200`, `0.1` | Budgets for the median; use the criterion's own when it is stricter |
-| `--inp-not-applicable` | off | Explicitly exclude INP for an intentionally passive journey; other missing metrics still fail |
-| `--no-video` | off | Dry run |
-
+| Option                                         | Default                       | Use                                                                                                                                |
+| ---------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `--url`, `--widths`, `--checks`                | required                      | Page, comma-separated widths, checks file                                                                                          |
+| `--wait-for <selector>`                        | none                          | Wait until the element is in the DOM before injecting                                                                              |
+| `--out <dir>`                                  | `output`                      | Where `<width>px.webm` goes                                                                                                        |
+| `--height <px>`                                | `900`                         | Viewport and video height                                                                                                          |
+| `--timeout <ms>`                               | `60000`                       | Per run; a journey that never finishes fails that run                                                                              |
+| `--runs <n>`                                   | `3`, or `1` with `--no-video` | Clean runs per width; the report gives the median and worst                                                                        |
+| `--throttle`                                   | off                           | Clean runs only: Lighthouse's mobile preset (CPU 4×, 562.5ms latency, 1474.56/675 Kbps)                                            |
+| `--budget-lcp`, `--budget-inp`, `--budget-cls` | `2500`, `200`, `0.1`          | Budgets for the median; use the criterion's own when it is stricter                                                                |
+| `--inp-not-applicable`                         | off                           | Explicitly exclude INP for an intentionally passive journey; other missing metrics still fail                                      |
+| `--no-video`                                   | off                           | Dry run; saves `<out>/<width>px.png` instead of a video                                                                            |
+| `--reuse-benchmark`                            | off                           | Reuse matching clean-run samples from `<out>/benchmark.json` instead of measuring again                                            |
+| `--header 'name: value'`                       | none                          | Request header on every request, repeatable (Playwright `extraHTTPHeaders`). The conditions line names the header, never its value |
+| `--timezone <IANA zone>`                       | system                        | Browser time zone, such as `Europe/Berlin` (Playwright `timezoneId`)                                                               |
+| `--locale <BCP 47>`                            | system                        | `navigator.language` and `Accept-Language`, such as `de-DE`                                                                        |
+| `--ignore-https-errors`                        | off                           | Accept self-signed and otherwise invalid certificates, for local HTTPS                                                             |
+| `--hide-consent`                               | off                           | Evidence run only: hide OneTrust, Cookiebot and Didomi consent dialogs                                                             |

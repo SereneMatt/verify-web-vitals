@@ -1,0 +1,6 @@
+interface:
+  display_name: 'No Comments'
+  short_description: 'Delete needless comments and fix the code they excuse'
+  default_prompt: 'Use $no-comments on the current diff against main.'
+policy:
+  allow_implicit_invocation: false
