@@ -58,7 +58,7 @@
   const details = {};
   let currentStep = '';
 
-  let stepEl, criteriaEl, vitalsContainer, summaryEl;
+  let stepEl, criteriaEl, vitalsPanel, vitalsContainer, summaryEl;
 
   if (display) {
     const overlay = document.createElement('div');
@@ -78,9 +78,9 @@
     stepEl = overlay.querySelector('[data-step]');
     criteriaEl = overlay.querySelector('[data-criteria]');
 
-    const vitalsPanel = document.createElement('div');
+    vitalsPanel = document.createElement('div');
     vitalsPanel.style.cssText = `
-      position:fixed; ${width < 600 ? 'bottom:72px' : 'top:12px'}; right:12px; z-index:2147483647;
+      display:none; position:fixed; ${width < 600 ? 'bottom:72px' : 'top:12px'}; right:12px; z-index:2147483647;
       background:#17171d; color:#eee;
       font:14px/1.3 system-ui, -apple-system, sans-serif;
       padding:12px 16px; border-radius:12px; pointer-events:none;
@@ -227,6 +227,9 @@
         .map(([key, pass]) => `${key}${ok(pass)}`)
         .join(' ')}`,
     summary: (text) => {
+      if (vitalsPanel) {
+        vitalsPanel.style.display = '';
+      }
       if (summaryEl) summaryEl.textContent = [text, benchmark?.conditions].filter(Boolean).join('\n');
       if (stepEl) stepEl.textContent = currentStep || `${width}px · results`;
     },

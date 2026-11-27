@@ -23,7 +23,7 @@ try {
 }
 const { runs } = options;
 const conditions = [
-  `${runs} benchmark ${runs === 1 ? 'run' : 'runs'} (no overlay, no recording, cold cache)`,
+  `${runs} benchmark ${runs === 1 ? 'run' : 'runs'} (cold cache)`,
   options.throttle
     ? `throttled: CPU ${throttle.cpu}×, ${throttle.latencyMs}ms latency, ${throttle.downloadKbps}/${throttle.uploadKbps} Kbps`
     : 'not throttled',
@@ -31,7 +31,6 @@ const conditions = [
   `web-vitals ${vitals.version}`,
   ...(options.timezone ? [`timezone ${options.timezone}`] : []),
   ...(options.locale ? [`locale ${options.locale}`] : []),
-  // Names only: header values can be credentials, and this line is printed and recorded.
   ...(options.headers ? [`headers ${Object.keys(options.headers).join(', ')}`] : [])
 ].join(' · ');
 

@@ -83,7 +83,7 @@ export const benchmarkWidths = async (session, conditions, saved) => {
       benchmarks.push({
         width,
         samples: entry.samples,
-        conditions: `${entry.conditions} · reused from benchmark.json (${entry.recordedAt})`
+        conditions: `${entry.conditions} · recorded at ${entry.recordedAt}`
       });
       continue;
     }

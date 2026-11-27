@@ -17,7 +17,7 @@ test('benchmark rows respect supplied results, fit mobile, and survive the displ
     const source = (await readFile('scripts/verify.js', 'utf8')).trim().replace(/;$/, '');
     const benchmark = {
       conditions:
-        '3 benchmark runs (no overlay, no recording, cold cache) · not throttled · headless Chromium · web-vitals',
+        'median · not throttled · headless Chromium · web-vitals',
       vitals: [
         { name: 'LCP', status: 'measured', median: 100, worst: 120, budget: 50, pass: false },
         {
@@ -30,6 +30,8 @@ test('benchmark rows respect supplied results, fit mobile, and survive the displ
       ]
     };
     await page.evaluate(`(${source})(() => {}, 'evidence', ${JSON.stringify(benchmark)})`);
+    assert.equal(await page.locator('[data-metric="LCP"]').isVisible(), false);
+    await page.evaluate(() => window.verify.summary('Benchmark complete'));
     await page.waitForTimeout(100);
     const lcp = await page.locator('[data-metric="LCP"]').innerText();
     assert.match(lcp, /100ms ❌/);
