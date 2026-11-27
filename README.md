@@ -1,8 +1,8 @@
 # verify-web-vitals
 
-Measure LCP, INP and CLS on the same journey you use for functional checks. Exit 0 only when every criterion **and** every required vital passes. Record one `.webm` per viewport that proves it.
+A tool to help agents record LCP, INP and CLS on the same workflow you use for functional checks.
 
-https://github.com/user-attachments/assets/7ed32772-453e-406f-93ea-9c84433f5925
+https://github.com/user-attachments/assets/eb4dbbc8-9e6a-4405-8102-f5ba9d2948cd
 
 ---
 
